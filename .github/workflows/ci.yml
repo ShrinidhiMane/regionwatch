@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest -q --cov=regionwatch --cov-report=term-missing
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build monitor image
+        run: docker build -t regionwatch:ci .
+      - name: Build demo service image
+        run: docker build -t regionwatch-demo:ci ./demo_service
+      - name: Smoke test the full stack
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/status | grep -q '"overall":"OK"'; then
+              echo "stack healthy"; docker compose down; exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs
+          docker compose down
+          exit 1

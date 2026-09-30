@@ -1,0 +1,39 @@
+# Three simulated "regions" plus the monitor.
+#   docker compose up --build
+#   open http://localhost:8080
+#   ./scripts/chaos.sh api-us-east crash     # watch it go DOWN and get auto-restarted
+services:
+  api-us-east:
+    build: ./demo_service
+    container_name: rw-api-us-east
+    environment: { SERVICE_NAME: api, REGION: us-east-sim }
+    ports: ["8001:8000"]
+    restart: "no"   # on purpose: RegionWatch, not Docker, brings it back
+
+  api-us-west:
+    build: ./demo_service
+    container_name: rw-api-us-west
+    environment: { SERVICE_NAME: api, REGION: us-west-sim }
+    ports: ["8002:8000"]
+    restart: "no"
+
+  auth-us-east:
+    build: ./demo_service
+    container_name: rw-auth-us-east
+    environment: { SERVICE_NAME: auth, REGION: us-east-sim }
+    ports: ["8003:8000"]
+    restart: "no"
+
+  regionwatch:
+    build: .
+    container_name: rw-monitor
+    ports: ["8080:8080"]
+    user: root   # needed to talk to the Docker socket for restarts
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - rw-data:/data
+    depends_on: [api-us-east, api-us-west, auth-us-east]
+    restart: unless-stopped
+
+volumes:
+  rw-data:

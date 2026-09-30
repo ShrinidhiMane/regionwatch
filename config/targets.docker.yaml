@@ -1,0 +1,39 @@
+# Used inside docker compose: services are reached by their compose names.
+interval_seconds: 3
+failure_threshold: 3
+recovery_threshold: 2
+latency_slo_ms: 500
+retries: 1
+db_path: /data/regionwatch.db
+# alert_webhook: https://hooks.slack.com/services/XXX   # optional
+
+targets:
+  - id: api-us-east
+    region: us-east-sim
+    url: http://api-us-east:8000/health
+    timeout_seconds: 2
+    remediation:
+      action: docker_restart
+      container: rw-api-us-east
+      cooldown_seconds: 15
+      max_attempts: 3
+
+  - id: api-us-west
+    region: us-west-sim
+    url: http://api-us-west:8000/health
+    timeout_seconds: 2
+    remediation:
+      action: docker_restart
+      container: rw-api-us-west
+      cooldown_seconds: 15
+      max_attempts: 3
+
+  - id: auth-us-east
+    region: us-east-sim
+    url: http://auth-us-east:8000/health
+    timeout_seconds: 2
+    remediation:
+      action: docker_restart
+      container: rw-auth-us-east
+      cooldown_seconds: 15
+      max_attempts: 3

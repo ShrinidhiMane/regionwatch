@@ -1,0 +1,19 @@
+# Used when running without Docker (see README "Run locally").
+# Start the demo services on ports 8001-8003 first.
+interval_seconds: 3
+failure_threshold: 3
+recovery_threshold: 2
+latency_slo_ms: 500
+retries: 1
+db_path: regionwatch.db
+
+targets:
+  - id: api-us-east
+    region: us-east-sim
+    url: http://127.0.0.1:8001/health
+  - id: api-us-west
+    region: us-west-sim
+    url: http://127.0.0.1:8002/health
+  - id: auth-us-east
+    region: us-east-sim
+    url: http://127.0.0.1:8003/health

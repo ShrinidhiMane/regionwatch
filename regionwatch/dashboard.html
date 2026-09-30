@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RegionWatch</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --ink:#e8eaf0; --muted:#8b91a1;
+          --ok:#2fb67c; --warn:#e0a526; --bad:#e5484d; --unk:#6b7280; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif;
+         background:var(--bg); color:var(--ink); padding:24px 16px; }
+  header { display:flex; align-items:baseline; gap:12px; max-width:1100px; margin:0 auto 20px; }
+  h1 { font-size:20px; margin:0; }
+  #overall { font-weight:600; padding:2px 10px; border-radius:999px; }
+  main { max-width:1100px; margin:0 auto; display:grid; gap:24px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+  .card { background:var(--card); border-radius:10px; padding:14px; border-left:4px solid var(--unk); }
+  .card h3 { margin:0 0 2px; font-size:15px; }
+  .muted { color:var(--muted); font-size:12px; }
+  .row { display:flex; justify-content:space-between; margin-top:6px; }
+  .HEALTHY { border-color:var(--ok); } .DEGRADED { border-color:var(--warn); }
+  .DOWN { border-color:var(--bad); } .UNKNOWN { border-color:var(--unk); }
+  .pill-HEALTHY,.pill-OK { background:var(--ok); color:#04130c; }
+  .pill-DEGRADED { background:var(--warn); color:#1a1200; }
+  .pill-DOWN { background:var(--bad); color:#fff; } .pill-UNKNOWN { background:var(--unk); }
+  .state { font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border-radius:10px; overflow:hidden; }
+  th, td { text-align:left; padding:8px 12px; border-bottom:1px solid #232733; font-size:13px; }
+  th { color:var(--muted); font-weight:500; }
+  h2 { font-size:15px; margin:0 0 8px; }
+</style>
+</head>
+<body>
+<header><h1>RegionWatch</h1><span id="overall">…</span><span class="muted" id="updated"></span></header>
+<main>
+  <section><div class="grid" id="targets"></div></section>
+  <section><h2>Recent events</h2>
+    <table><thead><tr><th>Time</th><th>Target</th><th>Kind</th><th>Detail</th></tr></thead>
+    <tbody id="events"></tbody></table></section>
+</main>
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pct = v => v == null ? "–" : (v * 100).toFixed(2) + "%";
+const ms = v => v == null ? "–" : Math.round(v) + " ms";
+async function refresh() {
+  try {
+    const [s, e] = await Promise.all([fetch("/status").then(r => r.json()), fetch("/events?limit=15").then(r => r.json())]);
+    const o = document.getElementById("overall");
+    o.textContent = s.overall; o.className = "pill-" + s.overall;
+    document.getElementById("targets").innerHTML = s.targets.map(t => `
+      <div class="card ${t.state}">
+        <div class="row" style="margin:0"><h3>${esc(t.id)}</h3><span class="state pill-${t.state}">${t.state}</span></div>
+        <div class="muted">${esc(t.region)}</div>
+        <div class="row"><span class="muted">Availability (1h)</span><span>${pct(t.availability_1h)}</span></div>
+        <div class="row"><span class="muted">p95 latency (1h)</span><span>${ms(t.p95_latency_ms_1h)}</span></div>
+        <div class="row"><span class="muted">Remediations</span><span>${t.remediation_attempts}</span></div>
+        ${t.last_error ? `<div class="muted" style="color:var(--bad);margin-top:6px">${esc(t.last_error)}</div>` : ""}
+      </div>`).join("");
+    document.getElementById("events").innerHTML = e.events.map(ev => `
+      <tr><td>${new Date(ev.ts * 1000).toLocaleTimeString()}</td><td>${esc(ev.target_id)}</td>
+      <td>${esc(ev.kind)}</td><td>${esc(ev.detail)}</td></tr>`).join("") ||
+      `<tr><td colspan="4" class="muted">No events yet</td></tr>`;
+    document.getElementById("updated").textContent = "updated " + new Date().toLocaleTimeString();
+  } catch (err) {
+    document.getElementById("updated").textContent = "monitor unreachable";
+  }
+}
+refresh(); setInterval(refresh, 3000);
+</script>
+</body>
+</html>
