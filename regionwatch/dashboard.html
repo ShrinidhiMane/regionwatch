@@ -29,10 +29,21 @@
   th, td { text-align:left; padding:8px 12px; border-bottom:1px solid #232733; font-size:13px; }
   th { color:var(--muted); font-weight:500; }
   h2 { font-size:15px; margin:0 0 8px; }
+  #demo { display:none; max-width:1100px; margin:0 auto 16px; background:var(--card);
+          border-radius:10px; padding:12px 14px; color:var(--muted); }
+  #demo b { color:var(--ink); }
+  .chaos { display:flex; gap:6px; margin-top:10px; }
+  .chaos button { flex:1; font:inherit; font-size:12px; padding:4px 0; border-radius:6px; cursor:pointer;
+                  background:transparent; color:var(--ink); border:1px solid #2c3140; }
+  .chaos button:hover { border-color:var(--warn); }
+  .chaos button:disabled { opacity:.5; cursor:default; }
 </style>
 </head>
 <body>
 <header><h1>RegionWatch</h1><span id="overall">…</span><span class="muted" id="updated"></span></header>
+<div id="demo"><b>Live demo.</b> Break a service with the buttons below, then watch RegionWatch
+  mark it DEGRADED or DOWN, auto-remediate it (after a few failed probes, with a cooldown between
+  attempts), and record every step in the event log.</div>
 <main>
   <section><div class="grid" id="targets"></div></section>
   <section><h2>Recent events</h2>
@@ -43,6 +54,21 @@
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const pct = v => v == null ? "–" : (v * 100).toFixed(2) + "%";
 const ms = v => v == null ? "–" : Math.round(v) + " ms";
+let demoFaults = [];
+fetch("/demo").then(r => r.ok ? r.json() : null).then(d => {
+  if (!d) return;
+  demoFaults = d.faults;
+  document.getElementById("demo").style.display = "block";
+  refresh();
+}).catch(() => {});
+const label = { slow: "Make slow", failing: "Make it fail" };
+document.addEventListener("click", async ev => {
+  const b = ev.target.closest("button[data-target]");
+  if (!b) return;
+  b.disabled = true;
+  try { await fetch(`/demo/chaos/${encodeURIComponent(b.dataset.target)}/${b.dataset.fault}`, { method: "POST" }); }
+  finally { setTimeout(() => { b.disabled = false; refresh(); }, 800); }
+});
 async function refresh() {
   try {
     const [s, e] = await Promise.all([fetch("/status").then(r => r.json()), fetch("/events?limit=15").then(r => r.json())]);
@@ -56,6 +82,8 @@ async function refresh() {
         <div class="row"><span class="muted">p95 latency (1h)</span><span>${ms(t.p95_latency_ms_1h)}</span></div>
         <div class="row"><span class="muted">Remediations</span><span>${t.remediation_attempts}</span></div>
         ${t.last_error ? `<div class="muted" style="color:var(--bad);margin-top:6px">${esc(t.last_error)}</div>` : ""}
+        ${demoFaults.length ? `<div class="chaos">${demoFaults.map(f =>
+          `<button data-target="${esc(t.id)}" data-fault="${f}">${label[f] || f}</button>`).join("")}</div>` : ""}
       </div>`).join("");
     document.getElementById("events").innerHTML = e.events.map(ev => `
       <tr><td>${new Date(ev.ts * 1000).toLocaleTimeString()}</td><td>${esc(ev.target_id)}</td>
