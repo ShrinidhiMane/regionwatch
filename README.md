@@ -42,6 +42,14 @@ flowchart LR
     AL --> SL[Slack webhook]
 ```
 
+## Hosted demo
+
+A single-container demo (`Dockerfile.demo`) runs the monitor and the three demo services together, with fault-injection buttons on the dashboard. Click **Make it fail** on a service and watch it go `DEGRADED → DOWN`, get auto-remediated, and recover. Every step lands in the event log.
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/ShrinidhiMane/regionwatch)
+
+A free host has no Docker socket, so this demo remediates through the webhook action: it calls the service's own reset endpoint instead of restarting a container. The detect → remediate → recover loop is the same. Injected faults also expire after `CHAOS_TTL_SECONDS` (60 s), so the shared demo never stays broken. Demo mode is opt-in (`demo_mode: true`), and the fault-injection routes don't exist otherwise.
+
 ## Quick start (Docker)
 
 ```bash
