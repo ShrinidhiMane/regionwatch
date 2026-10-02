@@ -7,6 +7,7 @@ import contextlib
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urljoin
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
@@ -21,6 +22,10 @@ from .store import Store
 
 log = logging.getLogger("regionwatch.api")
 DASHBOARD = Path(__file__).with_name("dashboard.html")
+
+# Faults a visitor may inject in demo mode. "crash" is left out on purpose: in the hosted
+# demo the services are processes, not containers, so nothing could bring them back.
+DEMO_FAULTS = ("slow", "failing")
 
 
 def build_monitor(settings: Settings, client: httpx.AsyncClient) -> Monitor:
@@ -86,6 +91,28 @@ def create_app(settings: Settings, monitor: Monitor | None = None,
     @app.get("/events")
     def events(limit: int = Query(100, ge=1, le=1000), target: str | None = None) -> dict:
         return {"events": mon().store.events(limit, target)}
+
+    if settings.demo_mode:
+        @app.get("/demo")
+        def demo_info() -> dict:
+            """Tells the dashboard to show the fault-injection buttons."""
+            return {"enabled": True, "faults": list(DEMO_FAULTS)}
+
+        @app.post("/demo/chaos/{target_id}/{fault}")
+        async def demo_chaos(target_id: str, fault: str) -> dict:
+            """Inject a fault into a demo service, then watch detection and auto-remediation."""
+            target = next((t for t in settings.targets if t.id == target_id), None)
+            if target is None:
+                raise HTTPException(status_code=404, detail=f"unknown target '{target_id}'")
+            if fault not in DEMO_FAULTS:
+                raise HTTPException(status_code=400, detail=f"fault must be one of {DEMO_FAULTS}")
+            try:
+                resp = await mon().client.post(urljoin(target.url, f"/chaos/{fault}"), timeout=3)
+                resp.raise_for_status()
+            except httpx.HTTPError as e:
+                raise HTTPException(status_code=502, detail=f"demo service unreachable: {e}") from e
+            log.info("demo: injected '%s' into %s", fault, target_id)
+            return {"target": target_id, "fault": fault}
 
     @app.get("/metrics", include_in_schema=False)
     def metrics() -> Response:

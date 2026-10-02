@@ -41,6 +41,7 @@ class Settings:
     retries: int = 2  # retries per probe, with exponential backoff
     db_path: str = "regionwatch.db"
     alert_webhook: str | None = None  # Slack-compatible incoming webhook
+    demo_mode: bool = False  # expose /demo/chaos so visitors can break the demo services
     targets: tuple[TargetConfig, ...] = ()
 
 
@@ -99,6 +100,7 @@ def parse_settings(raw: dict) -> Settings:
         retries=int(raw.get("retries", 2)),
         db_path=str(raw.get("db_path", "regionwatch.db")),
         alert_webhook=raw.get("alert_webhook"),
+        demo_mode=bool(raw.get("demo_mode", False)),
         targets=tuple(targets),
     )
     if settings.failure_threshold < 1 or settings.recovery_threshold < 1:

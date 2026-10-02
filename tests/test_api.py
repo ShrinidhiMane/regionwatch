@@ -46,3 +46,33 @@ def test_dashboard_served(app_and_monitor):
     with TestClient(app) as http:
         r = http.get("/")
         assert r.status_code == 200 and "RegionWatch" in r.text
+
+
+async def _app(client, clock, **overrides):
+    settings = make_settings(**overrides)
+    mon = Monitor(settings, Store(":memory:"), client, Alerter(), {"none": NoopAction()},
+                  clock=clock, sleep=no_sleep)
+    return create_app(settings, monitor=mon, start_background=False)
+
+
+async def test_demo_endpoints_absent_by_default(client, clock):
+    app = await _app(client, clock)
+    with TestClient(app) as http:
+        assert http.get("/demo").status_code == 404
+        assert http.post("/demo/chaos/api-east/failing").status_code == 404
+
+
+async def test_demo_chaos_forwards_fault_to_the_target(client, clock, backend):
+    app = await _app(client, clock, demo_mode=True)
+    with TestClient(app) as http:
+        assert http.get("/demo").json() == {"enabled": True, "faults": ["slow", "failing"]}
+        r = http.post("/demo/chaos/api-east/failing")
+        assert r.status_code == 200
+    assert backend.posts[-1][0] == "http://east/chaos/failing"
+
+
+async def test_demo_chaos_rejects_unknown_target_and_crash(client, clock):
+    app = await _app(client, clock, demo_mode=True)
+    with TestClient(app) as http:
+        assert http.post("/demo/chaos/nope/failing").status_code == 404
+        assert http.post("/demo/chaos/api-east/crash").status_code == 400
