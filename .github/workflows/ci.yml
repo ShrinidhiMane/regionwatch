@@ -33,6 +33,19 @@ jobs:
         run: docker build -t regionwatch:ci .
       - name: Build demo service image
         run: docker build -t regionwatch-demo:ci ./demo_service
+      - name: Smoke test the hosted demo image (inject a fault, expect auto-remediation)
+        run: |
+          docker build -f Dockerfile.demo -t regionwatch-hosted:ci .
+          docker run -d --name hosted -p 8090:8080 regionwatch-hosted:ci
+          for i in $(seq 1 30); do curl -fsS http://localhost:8090/status | grep -q '"overall":"OK"' && break; sleep 2; done
+          curl -fsS -X POST http://localhost:8090/demo/chaos/api-us-east/failing
+          for i in $(seq 1 30); do
+            if curl -fsS 'http://localhost:8090/events?target=api-us-east' | grep -q 'DOWN -> HEALTHY'; then
+              echo "fault detected, remediated and recovered"; docker rm -f hosted; exit 0
+            fi
+            sleep 2
+          done
+          docker logs hosted; docker rm -f hosted; exit 1
       - name: Smoke test the full stack
         run: |
           docker compose up -d --build

@@ -7,6 +7,9 @@ watch RegionWatch detect and fix them:
     POST /chaos/failing  -> /health returns 503
     POST /chaos/crash    -> the process exits (container stops)
     POST /chaos/healthy  -> back to normal
+
+Set CHAOS_TTL_SECONDS to make injected faults clear themselves after that long (the hosted
+demo uses this so a fault one visitor injects doesn't stick around for the next one).
 """
 
 from __future__ import annotations
@@ -14,20 +17,28 @@ from __future__ import annotations
 import asyncio
 import os
 import threading
+import time
 
 from fastapi import FastAPI, HTTPException, Response
 
 SERVICE = os.getenv("SERVICE_NAME", "demo-service")
 REGION = os.getenv("REGION", "local")
 MODES = {"healthy", "slow", "failing", "crash"}
+CHAOS_TTL = float(os.getenv("CHAOS_TTL_SECONDS", "0"))  # 0 = faults last until cleared
 
 app = FastAPI(title=f"{SERVICE} ({REGION})")
-state = {"mode": "healthy"}
+state = {"mode": "healthy", "until": None}
+
+
+def current_mode() -> str:
+    if state["until"] is not None and time.monotonic() >= state["until"]:
+        state["mode"], state["until"] = "healthy", None
+    return state["mode"]
 
 
 @app.get("/health")
 async def health(response: Response) -> dict:
-    mode = state["mode"]
+    mode = current_mode()
     if mode == "slow":
         await asyncio.sleep(1.2)
     if mode == "failing":
@@ -44,9 +55,10 @@ def chaos(mode: str) -> dict:
         # exit shortly after replying so the caller gets a response
         threading.Timer(0.2, lambda: os._exit(1)).start()
     state["mode"] = mode
+    state["until"] = time.monotonic() + CHAOS_TTL if CHAOS_TTL and mode != "healthy" else None
     return {"service": SERVICE, "mode": mode}
 
 
 @app.get("/")
 def root() -> dict:
-    return {"service": SERVICE, "region": REGION, "mode": state["mode"]}
+    return {"service": SERVICE, "region": REGION, "mode": current_mode()}
