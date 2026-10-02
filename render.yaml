@@ -1,0 +1,9 @@
+# One-click deploy of the hosted demo on Render's free tier.
+services:
+  - type: web
+    name: regionwatch-demo
+    runtime: docker
+    dockerfilePath: ./Dockerfile.demo
+    plan: free
+    healthCheckPath: /healthz
+    autoDeploy: true

@@ -1,0 +1,39 @@
+# Hosted demo (Dockerfile.demo): the three demo services run as processes in the same
+# container, so remediation can't restart a container. Instead it calls the service's own
+# reset endpoint through the webhook action, which exercises the same detect -> remediate ->
+# recover loop. Faults also expire on their own after CHAOS_TTL_SECONDS.
+interval_seconds: 2
+failure_threshold: 3
+recovery_threshold: 2
+latency_slo_ms: 500
+retries: 1
+db_path: /tmp/regionwatch.db
+demo_mode: true
+
+targets:
+  - id: api-us-east
+    region: us-east-sim
+    url: http://127.0.0.1:8001/health
+    remediation:
+      action: webhook
+      url: http://127.0.0.1:8001/chaos/healthy
+      cooldown_seconds: 10
+      max_attempts: 3
+
+  - id: api-us-west
+    region: us-west-sim
+    url: http://127.0.0.1:8002/health
+    remediation:
+      action: webhook
+      url: http://127.0.0.1:8002/chaos/healthy
+      cooldown_seconds: 10
+      max_attempts: 3
+
+  - id: auth-us-east
+    region: us-east-sim
+    url: http://127.0.0.1:8003/health
+    remediation:
+      action: webhook
+      url: http://127.0.0.1:8003/chaos/healthy
+      cooldown_seconds: 10
+      max_attempts: 3

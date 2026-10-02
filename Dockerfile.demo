@@ -1,0 +1,18 @@
+# Single-container hosted demo: monitor + three demo services. See config/targets.demo.yaml.
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 CHAOS_TTL_SECONDS=60
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY regionwatch ./regionwatch
+COPY config ./config
+COPY demo_service ./demo_service
+COPY scripts/demo-entrypoint.sh ./scripts/
+
+RUN useradd --create-home appuser
+USER appuser
+
+EXPOSE 8080
+CMD ["./scripts/demo-entrypoint.sh"]
