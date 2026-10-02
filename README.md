@@ -6,6 +6,8 @@ It's a small version of what reliability tooling does in a real cloud region: de
 
 ![CI](https://github.com/ShrinidhiMane/regionwatch/actions/workflows/ci.yml/badge.svg)
 
+**[Try the live demo →](https://regionwatch-demo.onrender.com)** Break a service and watch it heal itself.
+
 <!-- Add a screenshot of the dashboard here: docs/dashboard.png -->
 
 ## Features
@@ -43,6 +45,8 @@ flowchart LR
 ```
 
 ## Hosted demo
+
+**Live: https://regionwatch-demo.onrender.com**. It runs on a free tier, so the first visit after a quiet spell takes about a minute to wake up.
 
 A single-container demo (`Dockerfile.demo`) runs the monitor and the three demo services together, with fault-injection buttons on the dashboard. Click **Make it fail** on a service and watch it go `DEGRADED → DOWN`, get auto-remediated, and recover. Every step lands in the event log.
 
